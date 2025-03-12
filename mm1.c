@@ -61,6 +61,7 @@ int main(int argc, char **argv)
     unsigned int departures = 0;  // Total number of customers served
     double busyTime = 0.0;        // Total busy time
     double idleTime = 0.0;        // Added by georgia current idle time of the system
+    double idleTimeTotal = 0.0;   // Added by georgia total idle time 
     double s = 0.0;               // Area of number of customers in system
     double lastEventTime = time;  // Variable for "last event time"
     double lastBusyTime;          // Variable for "last start of busy time"
@@ -116,6 +117,7 @@ int main(int argc, char **argv)
                 {
                     idles++;
                     idlePeriods = addEntry(idlePeriods, idles, time - idleTime);
+                    idleTimeTotal = idleTimeTotal + (time - idleTime);
                     idleTime=0;
                 }
             }
@@ -159,22 +161,24 @@ int main(int argc, char **argv)
     printf("-    Mean service time            = %.9f sec \n", departTime);
     printf("<-------------------------------------------------------------> \n");
     printf("-  OUTPUTS: \n");
+    printf("-    Total busy time              = %.9f sec \n", busyTime);            // added by Georgia
+    printf("-    Total idle time              = %.9f sec \n", idleTimeTotal);       // added by Georgia 
     printf("-    # of Customers served        = %u cust \n", departures);
     printf("-    Throughput rate              = %f cust/sec \n", x);
     printf("-    Server utilization           = %f %% \n", 100.0 * u);
     printf("-    Avg # of cust. in system     = %f cust \n", l);
     printf("-    Mean Sojourn time            = %f sec \n", w);
-    printf("-  Arrival Time Periods: \n");
+    printf("-    Arrival Time Periods: \n");
     printList(arrivalPeriods);
-    printf("-  Service Time Periods: \n");
+    printf("-    Service Time Periods: \n");
     printList(servicePeriods);
-    printf("-  Idle Time Periods: \n");
+    printf("-    Idle Time Periods: \n");
     printList(idlePeriods);
     printIdleDistr(idlePeriods,time - busyTime);     // Added by Georgia Print Idle Distribution
     
     printf("<-------------------------------------------------------------> \n");
 
-    // Free memory added by georgia
+    // Free memory added by Georgia
     freeList(idlePeriods);
 }
 
@@ -200,7 +204,7 @@ static void show_usage(char *name)
 *       Node* addEntry(Node *head, int id, double value)
 **********************************************************************************
 * Function that adds a new entry to the linked-list with the idle period durations
-* (added by georgia)
+* (added by Georgia)
 * - Input: *head (head of linked-list)
 *           id (id of the item i want to add)
 *           value (idle time duration i want to add)
@@ -224,7 +228,7 @@ Node* addEntry(Node *head, int id, double value)
 *       freeList(Node *head)
 ********************************************************************************
 * Function that deletes the allocated memory of the  linked-list of idle 
-* durations (added by georgia)
+* durations (added by Georgia)
 * - Input: *head (head of linked-list)
 *******************************************************************************/
 void freeList(Node *head) 
@@ -240,7 +244,7 @@ void freeList(Node *head)
 /*******************************************************************************
 *       printList(Node *head)
 ********************************************************************************
-* Function to print the list of idle durations (added by georgia)
+* Function to print the list of idle durations (added by Georgia)
 * - Input: *head (head of linked-list)
 *******************************************************************************/
 void printList(Node *head) 
@@ -255,7 +259,7 @@ void printList(Node *head)
 /*******************************************************************************
 *       printIdleDistr(Node *head, double idleTime)
 ********************************************************************************
-* Print Idle Time Distribution (added by georgia)
+* Print Idle Time Distribution (added by Georgia)
 * - Input: *head (head of linked-list)
 *           idleTime (overall idle time of the simulation)
 *******************************************************************************/
