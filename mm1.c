@@ -70,10 +70,12 @@ int main(int argc, char **argv)
     double l;     // Average number of customers in system
     double w;     // Average Sojourn time
     Node *idlePeriods = NULL;     // Added by Georgia linked-list to save idle period duration
-    Node *arrivalPeriods = NULL;     // Added by Georgia linked-list to save idle period duration
-    Node *servicePeriods = NULL;     // Added by Georgia linked-list to save idle period duration
+    Node *arrivalPeriods = NULL;     // Added by Georgia linked-list to save interarrival times duration
+    Node *servicePeriods = NULL;     // Added by Georgia linked-list to save service time duration
+    Node *busyPeriods = NULL;     // Added by Georgia linked-list to save busy period duration
     unsigned int idles = 0; // Added by Georgia counter of idle periods
-    unsigned int arrivals = 0; // Added by Georgia counter of arrival periods      
+    unsigned int arrivals = 0; // Added by Georgia counter of arrival periods
+    unsigned int busy = 0; // Added by Georgia counter of busy periods      
 
     if (argc > 1)
     {     
@@ -140,6 +142,9 @@ int main(int argc, char **argv)
                 nextDeparture = SIM_TIME;
                 // Update busy time sum when no customers
                 busyTime = busyTime + time - lastBusyTime;
+                // update busy period duration when no customers
+                busy++;
+                busyPeriods = addEntry(busyPeriods, busy , time - lastBusyTime);
                 idleTime = time;
             }
         }
@@ -168,12 +173,14 @@ int main(int argc, char **argv)
     printf("-    Server utilization           = %f %% \n", 100.0 * u);
     printf("-    Avg # of cust. in system     = %f cust \n", l);
     printf("-    Mean Sojourn time            = %f sec \n", w);
-    printf("-    Arrival Time Periods: \n");
-    printList(arrivalPeriods);
-    printf("-    Service Time Periods: \n");
-    printList(servicePeriods);
+    // printf("-    Arrival Time Periods: \n");
+    // printList(arrivalPeriods);
+    // printf("-    Service Time Periods: \n");
+    // printList(servicePeriods);
+    // printf("-    Busy Time Periods: \n");
+    // printList(busyPeriods);
     printf("-    Idle Time Periods: \n");
-    printList(idlePeriods);
+    // printList(idlePeriods);
     printIdleDistr(idlePeriods,time - busyTime);     // Added by Georgia Print Idle Distribution
     
     printf("<-------------------------------------------------------------> \n");
