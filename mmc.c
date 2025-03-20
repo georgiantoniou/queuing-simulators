@@ -21,6 +21,7 @@
 #include <unistd.h>             // Needed for getopts()
 #include <stdbool.h>            // Needed for bool type
 #include "utils.h"              // Needed for expntl()
+#include <string.h>
 
 /*******************************************************************************
 * Defined constants and variables
@@ -51,6 +52,7 @@ void printInterarrival(Node *head);  // added by georgia print interarrival time
 void printCoreIdleDistr(Node *head, double idleTime);   // added by georgia print core idle distribution
 bool all_idle(double custDepartures[], int c);         // added by georgia  return true if all servers idle
 void printPackageIdleDistr(Node *head);                // added by georgia print pkg idle distribution
+void printDistr(Node *head);
 
 /*******************************************************************************
 * Main Function
@@ -75,7 +77,7 @@ int main(int argc, char **argv)
     double busyTime = 0.0;        // Total busy time
     double s = 0.0;               // Area of number of customers in system
     double lastEventTime = time;  // Variable for "last event time"
-    double lastBusyTime;          // Variable for "last start of busy time"
+    double lastBusyTime=-1;          // Variable for "last start of busy time"
     double x;     // Throughput rate
     double u;     // Utilization of system
     double l;     // Average number of customers in system
@@ -86,8 +88,10 @@ int main(int argc, char **argv)
     Node *packageIdlePeriods = NULL;  // Added by Georgia linked-list to save idle period duration
     Node *arrivalPeriods = NULL;     // Added by Georgia linked-list to save interarrival times duration
     Node *servicePeriods = NULL;     // Added by Georgia linked-list to save service time duration
+    Node *fullBusyPeriods = NULL;     // Added by Georgia linked-list to save service time duration
     Node *queuedArrivals = NULL; // added by georgia to check remember arrivals that are queued
     int lastAssignment = c-1;     // Added by Georgia remember last assignment of request to server for round robin
+    
     
     if (argc > 1)
     {     
@@ -114,11 +118,11 @@ int main(int argc, char **argv)
 
     double custDepartures[c]; // Departure times of serving customer
     double custIdle[c];    // added by georgia idle per core
-    double custIdleP=0;    // added by georgia idle per Package
+    double custIdleP=-1;    // added by georgia idle per Package
     double arrivals[c];    // added by georgia number of arrivals per core
     double custarrivals[c]; // added by georgia to measure the interarrival time of each core sees
     Node* arrivalsPerCore[c]; // added by georgia interarrival time per core;
-    Node* jobsQueue[c];
+    Node* jobsQueue[c]; 
 
     for (int i=0; i < c; i++)
     {    
@@ -152,18 +156,20 @@ int main(int argc, char **argv)
 
                 if (custIdle[arrayIndex] != -1)
                 {
-                    idleTimeAll = idleTimeAll + (time - custIdle[arrayIndex]);
-                    coreidlePeriods = addEntry(coreidlePeriods, time - custIdle[arrayIndex]);
+                    if ((time - custIdle[arrayIndex]) != (double) 0)
+                    {
+                        idleTimeAll = idleTimeAll + (time - custIdle[arrayIndex]);
+                        coreidlePeriods = addEntry(coreidlePeriods, time - custIdle[arrayIndex]);
+                    }
                     custIdle[arrayIndex] = -1;
                 }
+                arrivalsPerCore[arrayIndex] = addEntry(arrivalsPerCore[arrayIndex],time); // to measure interarrival time per core
             }
             else
             {
                 jobsQueue[arrayIndex] = addEntry(jobsQueue[arrayIndex],time);
             }
                                
-            arrivalsPerCore[arrayIndex] = addEntry(arrivalsPerCore[arrayIndex],time); // to measure interarrival time per core               
-
             if (n == 1)
             {
                 nextDepartIndex = arrayIndex;
@@ -177,14 +183,20 @@ int main(int argc, char **argv)
                 
             if (n >= c && all_active(custDepartures,c)) 
             {
-                lastBusyTime = time;    // Set "last start of busy time"
+                if (lastBusyTime == -1)
+                    lastBusyTime = time;    // Set "last start of busy time"
             }
 
             if (!all_idle(custDepartures,c))
             {
                 if (custIdleP != -1)
                 {
-                    packageIdlePeriods = addEntry(packageIdlePeriods, time - custIdleP); 
+                    if ((time - custIdleP) != (double) 0)
+                    {
+                        // printf("%.4f \n",time - custIdleP);
+                        packageIdlePeriods = addEntry(packageIdlePeriods, time - custIdleP); 
+                    
+                    }
                     custIdleP = -1;
                 }
             }
@@ -224,7 +236,10 @@ int main(int argc, char **argv)
                 
                 if (!all_active(custDepartures,c)) 
                 { // Update busy time when at least one server idle
-                    busyTime = busyTime + time - lastBusyTime;   
+                    busyTime = busyTime + time - lastBusyTime; 
+                    if (lastBusyTime != -1) 
+                        fullBusyPeriods =  addEntry(fullBusyPeriods, time - lastBusyTime);
+                    lastBusyTime = -1;
                 }
             }
             else
@@ -242,7 +257,7 @@ int main(int argc, char **argv)
     }
 
     // Compute outputs
-    x = departures / time;  // Compute throughput rate
+    x = departures / (time/1000000);  // Compute throughput rate
     u = busyTime / time;    // Compute server utilization
     l = s / time;             // Avg number of customers in the system
     w = l / x;              // Avg Sojourn time
@@ -252,9 +267,9 @@ int main(int argc, char **argv)
     printf("<           *** Results for M/M/%d simulation ***             > \n", c);
     printf("<-------------------------------------------------------------> \n");
     printf("-  INPUTS: \n");
-    printf("-    Total simulation time        = %.9f sec \n", endTime);
-    printf("-    Mean time between arrivals   = %.9f sec \n", arrTime);
-    printf("-    Mean service time            = %.9f sec \n", departTime);
+    printf("-    Total simulation time        = %.2f us \n", endTime);
+    printf("-    Mean time between arrivals   = %.2f us \n", arrTime);
+    printf("-    Mean service time            = %.2f us \n", departTime);
     printf("-    # of Servers in system       = %d servers \n", c);
     printf("<-------------------------------------------------------------> \n");
     printf("-  OUTPUTS: \n");
@@ -264,16 +279,26 @@ int main(int argc, char **argv)
     printf("-    Avg # of cust. in system     = %f cust \n", l);
     printf("-    Mean Sojourn time            = %f sec \n", w);
     // Added by Georgia
-    printf("-    Busy Time                    = %f sec (activity time of each core added together)\n", busyTimeAll);
-    printf("-    Idle Time                    = %f sec (idle time of each core added together)\n", idleTimeAll);
+    printf("-    Busy Time                    = %f us (activity time of each core added together)\n", busyTimeAll);
+    printf("-    Idle Time                    = %f us (idle time of each core added together)\n", idleTimeAll);
     printf("-    Average utilization          = %f %% \n", 100.0 * (busyTimeAll/(idleTimeAll+busyTimeAll)));
     printf("-    Arrivals per core: \n");
     for (int i=0; i< c ; i++)
         printf("-    Core %d                    = %f \n", i, arrivals[i]);
+    // for (int i=0; i< c ; i++)
+    // printInterarrival(arrivalsPerCore[1]);
+
     printf("-    Core Idle Time Distribution: \n");
+    printDistr(coreidlePeriods);
     printCoreIdleDistr(coreidlePeriods, idleTimeAll);
+
     printf("-    Package Idle Time Distribution: \n");
+    printDistr(packageIdlePeriods);
     printPackageIdleDistr(packageIdlePeriods);
+    // printList(packageIdlePeriods);
+
+    // printf("-    Full Busy Period Distribution: \n");
+    // printList(fullBusyPeriods);
 
     printf("<-------------------------------------------------------------> \n");
 }
@@ -366,7 +391,7 @@ void printList(Node *head)
 {
     Node *temp = head;
     while (temp) {
-        printf("Value: %.9f\n", temp->value);
+        printf("Value: %.4f\n", temp->value);
         temp = temp->next;
     }
 }
@@ -385,7 +410,7 @@ void printInterarrival(Node *head)
     {
         double value = temp->value - temp->next->value;
         temp = temp->next;
-        printf("-  Value = %f us \n", value*1000000);
+        printf("-  Value = %f us \n", value); // *1000000
 
     }
 }
@@ -439,20 +464,20 @@ void printCoreIdleDistr(Node *head, double idleTime)
     temp = head;
     while (temp != NULL) 
     {
-        if (temp->value < 0.000002)
+        if (temp->value < 2)
             distribution[0] = distribution[0]  + temp->value;
-        if  (temp->value < 0.000020) 
+        if  (temp->value < 20) 
             distribution[1] = distribution[1]  + temp->value;
-        if (temp->value < 0.000600)
+        if (temp->value < 600)
             distribution[2] = distribution[2]  + temp->value;
         distribution[3] = distribution[3]  + temp->value;
         temp = temp->next;
     }
       
-    printf("-   %% idle < 2us        = %.6f \n", distribution[0]/idleTime);
-    printf("-   %% idle < 20us       = %.6f \n", distribution[1]/idleTime);
-    printf("-   %% idle < 600us      = %.6f \n", distribution[2]/idleTime);
-    printf("-   %% idle > 600us      = %.6f \n", distribution[3]/idleTime);
+    printf("-   %% idle < 2us        = %.7f \n", distribution[0]/idleTime);
+    printf("-   %% idle < 20us       = %.7f \n", distribution[1]/idleTime);
+    printf("-   %% idle < 600us      = %.7f \n", distribution[2]/idleTime);
+    printf("-   %% idle > 600us      = %.7f \n", distribution[3]/idleTime);
 
 }
 
@@ -470,21 +495,21 @@ void printPackageIdleDistr(Node *head)
     temp = head;
     while (temp != NULL) 
     {
-        if (temp->value < 0.000010)
+        if (temp->value < 10)
             distribution[0] = distribution[0]  + temp->value;
-        if  (temp->value < 0.000100) 
+        if  (temp->value < 100) 
             distribution[1] = distribution[1]  + temp->value;
-        if (temp->value < 0.001000)
+        if (temp->value < 1000)
             distribution[2] = distribution[2]  + temp->value;
         distribution[3] = distribution[3]  + temp->value;
         allIdle = allIdle + temp->value;
         temp = temp->next;
     }
     
-    printf("-   %% idle < 10us        = %.6f \n", distribution[0]/allIdle);
-    printf("-   %% idle < 100us       = %.6f \n", distribution[1]/allIdle);
-    printf("-   %% idle < 1000us      = %.6f \n", distribution[2]/allIdle);
-    printf("-   %% idle > 1000us      = %.6f \n", distribution[3]/allIdle);
+    printf("-   %% idle < 10us        = %.7f \n", distribution[0]/allIdle);
+    printf("-   %% idle < 100us       = %.7f \n", distribution[1]/allIdle);
+    printf("-   %% idle < 1000us      = %.7f \n", distribution[2]/allIdle);
+    printf("-   %% idle > 1000us      = %.7f \n", distribution[3]/allIdle);
 
 }
 
@@ -516,4 +541,79 @@ bool all_idle(double custDepartures[], int c)
 
     }
     return true;
+}
+
+void printDistr(Node *head)
+{
+    struct Node *node=NULL, *temp = NULL;
+    node = head;
+    temp = head;
+    double max = 0;
+    while (temp != NULL) 
+    {
+        if ((temp->value) > max)
+        {
+            max = temp->value;
+        }
+
+        temp = temp->next;
+    }
+
+    max = (max) + 1; // *1000000
+    
+    double distrVal[(int)max];
+    double distrCount[(int)max];
+
+    for (int i = 0; i < max; i++) {
+        distrVal[i] = 0.0;
+        distrCount[i] = 0;
+    }
+
+    double distrAll = 0.0;
+    double distrCountAll = 0.0;
+    temp = head;
+
+    while (temp != NULL) 
+    {
+        distrVal[(int) floor(temp->value + 1)] = distrVal[(int)floor(temp->value+1)] + temp->value; // *1000000
+        distrCount[(int)floor(temp->value + 1)] = distrCount[(int)floor(temp->value+1)] + 1;
+        distrAll = distrAll + temp->value;
+        distrCountAll = distrCountAll + 1;
+        temp = temp->next;
+    }
+    
+    char *label, *labelVal, *labelCount;
+    label = malloc(15 * (int) max * sizeof(char));
+    labelVal = malloc(15 * (int) max * sizeof(char));
+    labelCount = malloc(15 * (int) max * sizeof(char));
+    
+    strcat(label, "0");
+    char tmp[50];
+    sprintf(tmp, "%.4f", distrVal[0] / distrAll); 
+    strcat(labelVal, tmp);
+    sprintf(tmp, "%.4f", distrCount[0] / distrCountAll);  
+    strcat(labelCount, tmp);
+   
+    double allVal = distrVal[0] / distrAll;
+    double allCount = distrCount[0];
+
+    for (int i = 1 ; i < (int) max; i++)
+    {
+        sprintf(tmp, ",%d", i);
+        strcat(label,tmp);
+        
+        sprintf(tmp, ",%.4f", (allVal + distrVal[i] / distrAll));
+        strcat(labelVal,tmp);
+
+        sprintf(tmp, ",%.4f", (allCount + distrCount[i] / distrCountAll));
+        strcat(labelCount,tmp);
+
+        allVal = allVal + distrVal[i] / distrAll;
+        allCount = allCount + distrCount[i] / distrCountAll;
+    }
+
+    printf("%s \n", label);
+    printf("%s \n", labelVal);
+    // printf("%s \n", labelCount);
+
 }
